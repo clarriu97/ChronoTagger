@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from PIL import Image
 import piexif
 import argparse
+from tqdm import tqdm
 
 
 def extract_date_and_order_img_yyyymmdd(filename):
@@ -35,37 +36,54 @@ def process_images(undated_folder, dated_folder):
         extract_date_and_order_img_yyyymmdd,
     ]
 
-    for filename in sorted(os.listdir(undated_folder)):
-        file_path = os.path.join(undated_folder, filename)
+    filenames = sorted(os.listdir(undated_folder))
+    total_files = len(filenames)
 
-        if os.path.isfile(file_path):
-            date_str = None
+    with tqdm(total=total_files, desc="Processing Images", unit="image") as pbar:
+        for filename in filenames:
+            file_path = os.path.join(undated_folder, filename)
 
-            for extractor in date_extractors:
-                date_str = extractor(filename)
+            if os.path.isfile(file_path):
+                new_file_path = os.path.join(dated_folder, filename)
+
+                if os.path.exists(new_file_path):
+                    pbar.write(f"File {filename} already exists in the output folder. Skipping.")
+                    pbar.update(1)
+                    continue
+
+                date_str = None
+
+                for extractor in date_extractors:
+                    date_str = extractor(filename)
+                    if date_str:
+                        break
+
                 if date_str:
-                    break
+                    try:
+                        img = Image.open(file_path)
 
-            if date_str:
-                try:
-                    img = Image.open(file_path)
-                    exif_dict = piexif.load(img.info.get('exif', b''))
+                        exif_bytes = img.info.get('exif')
+                        if exif_bytes:
+                            exif_dict = piexif.load(exif_bytes)
+                        else:
+                            exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}
 
-                    exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal] = date_str
-                    exif_dict['Exif'][piexif.ExifIFD.DateTimeDigitized] = date_str
+                        exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal] = date_str
+                        exif_dict['Exif'][piexif.ExifIFD.DateTimeDigitized] = date_str
 
-                    exif_bytes = piexif.dump(exif_dict)
+                        exif_bytes_new = piexif.dump(exif_dict)
 
-                    new_file_path = os.path.join(dated_folder, filename)
+                        img.save(new_file_path, exif=exif_bytes_new)
+                        img.close()
 
-                    img.save(new_file_path, exif=exif_bytes)
-                    img.close()
-
-                    print(f"Processed: {filename} with date {date_str}")
-                except Exception as e:
-                    print(f"Error processing {filename}: {e}")
+                        pbar.write(f"Processed: {filename} with date {date_str}")
+                    except Exception as e:
+                        pbar.write(f"Error processing {filename}: {e}")
+                else:
+                    pbar.write(f"Could not extract date from: {filename}")
             else:
-                print(f"Could not extract date from: {filename}")
+                pbar.write(f"{filename} is not a file. Skipping.")
+            pbar.update(1)
 
 
 def main():

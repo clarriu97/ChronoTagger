@@ -19,12 +19,12 @@ pdm install
 
 ## Usage
 
-Place the undated images in a folder, by default named undated. You can change the folder name if you wish.
+Place the undated images in a folder, by default named `undated`. You can change the folder name if you wish.
 
 Run the script from the command line:
 
 ```bash
-pdm run chrono-tagger --undated_folder "path/to/your/undated_folder" --dated_folder "path/to/your/dated_folder"
+pdm run python -m chronotagger.script --undated_folder "undated" --dated_folder "dated"
 ```
 
 - `--undated_folder`: Folder containing images without dates. Default is undated.
